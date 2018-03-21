@@ -38,20 +38,21 @@ namespace glacierup
         private static void HandleStatus(string[] args)
         {
             int interval;
-            if (args.Length < 6 || !int.TryParse(args[4], out interval))
+            var region = RegionEndpoint.EnumerableAllRegions.SingleOrDefault(reg => reg.SystemName == args[2]);
+            if (args.Length < 7 || !int.TryParse(args[5], out interval) || region == null)
             {
-                Console.WriteLine("args should be aws_key aws_secret vault_name job_id interval_secs output_filename");
+                Console.WriteLine("args should be aws_key aws_secret region vault_name job_id interval_secs output_filename");
                 return;
             }
             var aws_key = args[0];
             var aws_secret = args[1];
-            var vault_name = args[2];
-            var job_id = args[3];
-            var filename = args[5];
+            var vault_name = args[3];
+            var job_id = args[4];
+            var filename = args[6];
             var creds = new BasicAWSCredentials(aws_key, aws_secret);
             var config = new AmazonGlacierConfig
             {
-                RegionEndpoint = RegionEndpoint.USWest1,
+                RegionEndpoint = region,
                 Timeout = TimeSpan.FromDays(10)
             };
             var client = new AmazonGlacierClient(creds, config);
@@ -78,19 +79,20 @@ namespace glacierup
 
         private static void HandleInventory(string[] args)
         {
-            if (args.Length < 4)
+            var region = RegionEndpoint.EnumerableAllRegions.SingleOrDefault(reg => reg.SystemName == args[2]);
+            if (args.Length < 5 || region == null)
             {
-                Console.WriteLine($"args should be aws_key aws_secret vault_name output_filename");
+                Console.WriteLine($"args should be aws_key aws_secret region vault_name output_filename");
                 return;
             }
             var aws_key = args[0];
             var aws_secret = args[1];
-            var vault_name = args[2];
-            var filename = args[3];
+            var vault_name = args[3];
+            var filename = args[4];
             var creds = new BasicAWSCredentials(aws_key, aws_secret);
             var config = new AmazonGlacierConfig
             {
-                RegionEndpoint = RegionEndpoint.USWest1,
+                RegionEndpoint = region,
                 Timeout = TimeSpan.FromDays(10)
             };
             var client = new AmazonGlacierClient(creds, config);
@@ -106,20 +108,21 @@ namespace glacierup
 
         private static void HandleUpload(string[] args)
         {
-            if (args.Length < 5)
+            var region = RegionEndpoint.EnumerableAllRegions.SingleOrDefault(reg => reg.SystemName == args[2]);
+            if (args.Length < 6 || region == null)
             {
-                Console.WriteLine($"args should be aws_key aws_secret vault_name description filename");
+                Console.WriteLine($"args should be aws_key aws_secret region vault_name description filename");
                 return;
             }
             var aws_key = args[0];
             var aws_secret = args[1];
-            var vault_name = args[2];
-            var description = args[3];
-            var filename = args[4];
+            var vault_name = args[3];
+            var description = args[4];
+            var filename = args[5];
             var creds = new BasicAWSCredentials(aws_key, aws_secret);
             var config = new AmazonGlacierConfig
             {
-                RegionEndpoint = RegionEndpoint.USWest1,
+                RegionEndpoint = region,
                 Timeout = TimeSpan.FromDays(10)
             };
             var client = new AmazonGlacierClient(creds, config);
