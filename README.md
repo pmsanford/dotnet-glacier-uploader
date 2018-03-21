@@ -4,7 +4,7 @@ Minimal multipart uploader for large files to Amazon Glacier
 1. Install [dotnet SDK 2.1](https://www.microsoft.com/net/download)
 2. Sign into your AWS account and [create a Glacier vault](https://console.aws.amazon.com/glacier/home)
 3. Clone this repo
-4. In the repo directory, run `dotnet run <aws access key> <aws secret key> <glacier vault name> <file description> <file path>`
+4. In the repo directory, run `dotnet run upload <aws access key> <aws secret key> <glacier vault name> <file description> <file path>`
 
 The file description is the only identifier for the archive in AWS. The vault name should obviously match the name from step 2.
 
