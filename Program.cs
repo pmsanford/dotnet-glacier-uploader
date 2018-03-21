@@ -17,9 +17,94 @@ namespace glacierup
     {
         private const long Megabytes = 1024 * 1024;
         private const long PartSize = 64 * Megabytes;
-        private const int ConcurrencyLimit = 10;
+        private const int ConcurrencyLimit = 20;
 
         static void Main(string[] args)
+        {
+            if (args[0] == "upload")
+            {
+                HandleUpload(args.Skip(1).ToArray());
+            }
+            if (args[0] == "inventory")
+            {
+                HandleInventory(args.Skip(1).ToArray());
+            }
+            if (args[0] == "statuswatch")
+            {
+                HandleStatus(args.Skip(1).ToArray());
+            }
+        }
+
+        private static void HandleStatus(string[] args)
+        {
+            int interval;
+            if (args.Length < 6 || !int.TryParse(args[4], out interval))
+            {
+                Console.WriteLine("args should be aws_key aws_secret vault_name job_id interval_secs output_filename");
+                return;
+            }
+            var aws_key = args[0];
+            var aws_secret = args[1];
+            var vault_name = args[2];
+            var job_id = args[3];
+            var filename = args[5];
+            var creds = new BasicAWSCredentials(aws_key, aws_secret);
+            var config = new AmazonGlacierConfig
+            {
+                RegionEndpoint = RegionEndpoint.USWest1,
+                Timeout = TimeSpan.FromDays(10)
+            };
+            var client = new AmazonGlacierClient(creds, config);
+            var descReq = new DescribeJobRequest(vault_name, job_id);
+            do
+            {
+                Console.WriteLine("Checking status...");
+                var jobStatus = client.DescribeJobAsync(descReq).Result;
+                if (jobStatus.Completed)
+                {
+                    Console.WriteLine("Job completed.");
+                    break;
+                }
+                Console.WriteLine($"Job incomplete.");
+                Console.WriteLine($"Job status: {jobStatus.StatusCode}");
+                Thread.Sleep(interval);
+            } while (true);
+            var retrReq = new GetJobOutputRequest(vault_name, job_id, "bytes=0-1073741824");
+            var retrievalPromise = client.GetJobOutputAsync(retrReq).Result;
+            var json = new StreamReader(retrievalPromise.Body).ReadToEnd();
+            File.WriteAllText(filename, json);
+            Console.WriteLine($"Output written to {filename}");
+        }
+
+        private static void HandleInventory(string[] args)
+        {
+            if (args.Length < 4)
+            {
+                Console.WriteLine($"args should be aws_key aws_secret vault_name output_filename");
+                return;
+            }
+            var aws_key = args[0];
+            var aws_secret = args[1];
+            var vault_name = args[2];
+            var filename = args[3];
+            var creds = new BasicAWSCredentials(aws_key, aws_secret);
+            var config = new AmazonGlacierConfig
+            {
+                RegionEndpoint = RegionEndpoint.USWest1,
+                Timeout = TimeSpan.FromDays(10)
+            };
+            var client = new AmazonGlacierClient(creds, config);
+            var initReq = new InitiateJobRequest(vault_name, new JobParameters("JSON", "inventory-retrieval", null, null));
+            var promise = client.InitiateJobAsync(initReq);
+            promise.ContinueWith(job =>
+            {
+                Console.WriteLine($"Job ID: {job.Result.JobId}");
+                File.WriteAllText(filename, job.Result.JobId);
+            });
+            Console.WriteLine("Retrieval job initiated");
+        }
+
+        private static void HandleUpload(string[] args)
         {
             if (args.Length < 5)
             {
@@ -55,7 +140,8 @@ namespace glacierup
                     totalSize = fs.Length;
                     Console.WriteLine($"Preparing to upload {ByteSize.FromBytes(totalSize)}");
                     totalParts = (int)(fs.Length / PartSize) + 1;
-                    while (true)
+                    bool noErrors = true;
+                    while (noErrors)
                     {
                         sem.Wait();
                         var arr = new byte[PartSize];
@@ -72,6 +158,12 @@ namespace glacierup
                         Console.WriteLine($"Started {started} out of {totalParts}");
                         promise.ContinueWith(tsk =>
                         {
+                            if (tsk.IsFaulted)
+                            {
+                                Console.WriteLine($"Exception encountered: {tsk.Exception.ToString()}");
+                                noErrors = false;
+                                throw tsk.Exception;
+                            }
                             Interlocked.Increment(ref completed);
                             Console.WriteLine($"{completed} out of {totalParts} completed.");
                             sem.Release();
